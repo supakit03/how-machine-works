@@ -163,6 +163,8 @@ p{margin:0}
 .menu-scrim{position:fixed;inset:0;z-index:50;background:rgba(23,26,32,.35);display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));overflow-y:auto}
 .menu-sheet{width:min(860px,100%);background:var(--bg);border-radius:8px;box-shadow:0 20px 60px rgba(23,26,32,.25);padding:24px;display:flex;flex-direction:column;gap:18px}
 .menu-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.menu-groups{display:flex;flex-direction:column;gap:22px}
+.menu-group{display:flex;flex-direction:column;gap:10px}
 .menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
 .mcard{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;padding:16px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer;font:inherit;color:var(--fg)}
 .mcard:hover{border-color:#b9bcc0}
@@ -396,7 +398,7 @@ img{max-width:100%}
 <div class="menu-scrim" id="menu" hidden>
   <div class="menu-sheet" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
     <div class="menu-head"><div><p class="eyebrow">Machine Garage</p><h2 id="menuTitle">Choose a machine</h2></div><button class="btn" type="button" id="menuClose">Close</button></div>
-    <div class="menu-grid" id="menuGrid"></div>
+    <div class="menu-groups" id="menuGrid"></div>
   </div>
 </div>
 
@@ -2102,8 +2104,12 @@ const MACHINES = {
     intro:{title:'A pump for heat', lede:'An air conditioner does not create cold. It uses a sealed loop of refrigerant to carry heat out of your room and release it outdoors. Click a part or pick one from the list to learn what it does.', tip:'Press <b>Cool on</b>, then drag <b>Explode</b> to pull both units apart.'},
     engine:{on:'Cool on', off:'Cool off', toast:'Cooling. The compressor hums and both fans spin up.', sound:{pulse:48,hum:96,lp:260,gain:0.14}}}
 };
-const ORDER=['diesel','ev','moto','wind','solar','phone','ac'];
-const LOCKED=[{id:'jet',name:'Jet engine',desc:'Fan, compressor, combustor and turbine.'}];
+const GROUPS=[
+  {name:'Vehicles', ids:['diesel','ev','moto'], locked:[{id:'jet',name:'Jet engine',desc:'Fan, compressor, combustor and turbine.'}]},
+  {name:'Energy', ids:['wind','solar']},
+  {name:'Home & electronics', ids:['phone','ac']}
+];
+const ORDER=GROUPS.flatMap(g=>g.ids);
 
 /* ---------- Save ---------- */
 const KEY='machine-garage-v1';
@@ -2950,11 +2956,13 @@ function stepCar(dt,now){
 const menuEl=$('#menu'), menuGrid=$('#menuGrid');
 let menuReturn=null;
 function renderMenu(){
-  menuGrid.innerHTML=ORDER.map(id=>{
+  const card=id=>{
     const d=MACHINES[id], st=save.m[id]||{found:[],tourStep:0,tourDone:[],tourComplete:false};
     const tourTxt=st.tourComplete?'Tour complete':(st.tourDone.length?'Tour step '+(Math.min(st.tourStep,d.tour.length-1)+1)+' of '+d.tour.length:'Tour not started');
     return '<button type="button" class="mcard'+(id===cur?' on':'')+'" data-id="'+id+'"><svg viewBox="0 0 120 56" aria-hidden="true">'+ICONS[id]+'</svg><span class="mc-name">'+d.name+(id===cur?' <em>Open now</em>':'')+'</span><span class="mc-desc">'+d.desc+'</span><span class="mc-prog">'+st.found.length+' / '+d.parts.length+' parts · '+tourTxt+'</span></button>';
-  }).join('')+LOCKED.map(l=>'<div class="mcard locked" aria-disabled="true"><svg viewBox="0 0 120 56" aria-hidden="true">'+ICONS[l.id]+'</svg><span class="mc-name">'+l.name+' <em>Coming later</em></span><span class="mc-desc">'+l.desc+'</span></div>').join('');
+  };
+  const lockedCard=l=>'<div class="mcard locked" aria-disabled="true"><svg viewBox="0 0 120 56" aria-hidden="true">'+ICONS[l.id]+'</svg><span class="mc-name">'+l.name+' <em>Coming later</em></span><span class="mc-desc">'+l.desc+'</span></div>';
+  menuGrid.innerHTML=GROUPS.map(g=>'<section class="menu-group" aria-label="'+g.name+'"><h3 class="eyebrow">'+g.name+' · '+g.ids.length+'</h3><div class="menu-grid">'+g.ids.map(card).join('')+(g.locked||[]).map(lockedCard).join('')+'</div></section>').join('');
   menuGrid.querySelectorAll('button.mcard').forEach(b=>b.addEventListener('click',()=>{ closeMenu(); selectMachine(b.dataset.id); }));
 }
 function openMenu(){ menuReturn=document.activeElement; renderMenu(); menuEl.hidden=false; const f=menuGrid.querySelector('button.mcard'); if(f) f.focus(); }
